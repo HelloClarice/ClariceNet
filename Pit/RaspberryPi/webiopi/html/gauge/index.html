@@ -1,0 +1,200 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+<head>
+    <meta application-name="Clarice" data-min-size="4,2" />
+
+    <script type="text/javascript" src="jquery.js"></script>
+    <script type="text/javascript" src="d3.js"></script>
+    <script type="text/javascript" src="gauge.js"></script>
+    <script type="text/javascript" src="/webiopi.js"></script>
+	<style>
+		/*body { padding: 100px; background-color: #222; }*/
+		.led-red {
+		    margin: 40px;
+		    width: 24px;
+		    height: 24px;
+		    background-color: #994400;
+		    border-radius: 50%;
+		    box-shadow: #000 0 -1px 7px 1px, inset #600 0 -1px 9px, #F00 0 2px 12px;
+		}
+
+		.led-yellow {
+		    margin: 20px auto;
+		    width: 12px;
+		    height: 12px;
+		    background-color: #A90;
+		    border-radius: 50%;
+		    box-shadow: #000 0 -1px 7px 1px, inset #660 0 -1px 9px, #DD0 0 2px 12px;
+		}
+
+		.led-green {
+		    margin: 20px auto;
+		    width: 12px;
+		    height: 12px;
+		    background-color: #690;
+		    border-radius: 50%;
+		    box-shadow: #000 0 -1px 7px 1px, inset #460 0 -1px 9px, #7D0 0 2px 12px;
+		}
+
+		.led-blue {
+		    margin: 20px auto;
+		    width: 12px;
+		    height: 12px;
+		    background-color: #4AB;
+		    border-radius: 50%;
+		    box-shadow: #000 0 -1px 7px 1px, inset #006 0 -1px 9px, #06F 0 2px 14px;
+		}
+	</style>
+
+    <script type="text/javascript">
+    $(document).ready(function() {
+
+        var gauges = [];
+		var leds = new Array(3);
+
+        function createGauge(name, label, min, max)
+        {
+            var config =
+            {
+                size: 150,
+                label: label,
+                min: undefined != min ? min : 0,
+                max: undefined != max ? max : 100,
+                minorTicks: 5
+            }
+
+            var range = config.max - config.min;
+            config.yellowZones = [{ from: config.min + range*0.75, to: config.min + range*0.9 }];
+            config.redZones = [{ from: config.min + range*0.9, to: config.max }];
+
+            gauge = new Gauge(name + "GaugeContainer", config);
+			gauges.push(gauge);
+            gauge.render();
+        }
+
+        var answerTimeout
+
+        function sendMessage() {
+            var data = $("#inputText").val();
+            if (data.length > 0) {
+                var d = $("#output").text() + data + "\n";
+                $("#output").text(d);
+                webiopi().callMacro("sendMessage", data, readAnswer);
+            }
+            // webiopi().Serial($("#devices").val()).write(data);
+            $("#inputText").val("");
+        }
+
+        function readAnswer() {
+            if (answerTimeout != undefined) {
+                clearTimeout(answerTimeout)
+            }
+
+            webiopi().callMacro("getAnswer", null, function(macro, args, data) {
+                if (data.length > 0) {
+                    var d = $("#output").text() + data + "\n";
+                    $("#output").text(d);
+                } else {
+                    answerTimeout = setTimeout(readAnswer, 500);
+                }
+            });
+        }
+
+		function hexc(colorval) {
+		    var parts = colorval.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+		    delete(parts[0]);
+		    for (var i = 1; i <= 3; ++i) {
+		        parts[i] = parseInt(parts[i]).toString(16);
+		        if (parts[i].length == 1) parts[i] = '0' + parts[i];
+		    }
+		    return '#' + parts.join('');
+		}
+
+        function startUpdateTimer() {
+	        $.post('/macros/getCarInfo/True,True')
+				.done(function(response) {
+	                try {
+						var json = $.parseJSON(response);
+						var sensors = json["sensors"];
+						var buttons = json["buttons"];
+						if (sensors) {
+							for(var i in sensors) {
+								// console.log(sensors[i]);
+	                        	gauges[i].redraw(Math.floor(parseFloat(sensors[i])));
+							}
+						}
+						if (buttons) {
+							for(var i in buttons) {
+								leds[i] = buttons[i];
+							}
+						}
+	                }
+	                catch (err) {
+	                }
+	        	});
+
+            setTimeout(startUpdateTimer, 1000);
+        }
+
+		function startLEDTimer() {
+			for(var i in leds) {
+				if (leds[i] >= 1) {
+					var x = $("#button"+i).css('backgroundColor');
+					// console.log(hexc(x));
+					if (hexc(x) == '#994400' || leds[i] == 2) {
+						$("#button"+i).css({'backgroundColor':'#FF4D4D'})
+					} else {
+						$("#button"+i).css({'backgroundColor':'#994400'})
+					}
+				} else {
+					$("#button"+i).css({'backgroundColor':'#994400'})
+				}
+			}
+
+            setTimeout(startLEDTimer, 200);
+		}
+
+        function getQueryParam(name) {
+            name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
+            var regex = new RegExp("[\\?&]" + name + "=([^&#\/]*)"),
+                results = regex.exec(window.location.search);
+            return results == null ? null : decodeURIComponent(results[1].replace(/\+/g, " "));
+        }
+
+        try {
+            var name = getQueryParam('name') || 'sensor1';
+            var max = getQueryParam('max') || 1000;
+
+            createGauge("sensor1", "Sensor1", 0, max);
+            createGauge("sensor2", "Sensor2", 0, max);
+            createGauge("sensor3", "Sensor3", 0, max);
+            createGauge("sensor4", "Sensor4", 0, max);
+
+            startUpdateTimer();
+			startLEDTimer();
+
+            $("*").click(function(){
+                return false;
+            });
+
+            $("#inputText").keyup(function(event){
+                if(event.keyCode == 13){
+                    sendMessage();
+                }
+            });
+        }
+        catch (err) {
+            $(document.body).html('Error: ' + err);
+        }
+    });
+    </script>
+</head>
+<body>
+	<br/>
+	<br/>
+    <span id="sensor1GaugeContainer"></span>
+    <span id="sensor2GaugeContainer"></span>
+    <span id="sensor3GaugeContainer"></span>
+</body>
+</html>

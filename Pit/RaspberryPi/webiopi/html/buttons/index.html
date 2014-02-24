@@ -1,0 +1,131 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+<head>
+    <meta application-name="Clarice" data-min-size="4,2" />
+	<link rel="stylesheet" type="text/css" href="style.css" media="screen" >
+     <script type="text/javascript" src="/jquery.js"></script>
+    <!-- <script type="text/javascript" src="/webiopi.js"></script> -->
+	<script>
+	    $(document).ready(function() {
+			$('.button').on('click', function(){
+				var index = $(this).attr('id').match(/-?\d+$/)[0];
+				if (leds[index-1] == 1) {
+					$(this).addClass('on');
+					setPitButton(index-1, 1);
+				} else {
+					$(this).removeClass('on');
+					setPitButton(index-1, 0);
+				}
+			});
+			// $('.led').on('click', function(){
+			// 	var index = $(this).attr('id').match(/-?\d+$/)[0];
+			// 	leds[index-1] = (leds[index-1] + 1 ) % 3;
+			// 	console.log("clicked led" + index + " state=" + leds[index-1]);
+			// });
+
+			var leds = Array.apply(null, new Array(10)).map(Number.prototype.valueOf, 0);
+			function startLEDTimer() {
+				for(var i in leds) {
+					var id = parseInt(i)+1;
+					switch(leds[i]) {
+						case 0:
+							$('#led'+id).removeClass('on');
+
+							if ($('#button'+id).hasClass('on')) {
+								console.log("Turnning off button " + id);
+								$('#button'+id).removeClass('on');
+								setPitButton(i, 0);
+							}
+							break;
+						case 1:
+							$('#led'+id).toggleClass('on');
+							break;
+						case 2:
+							$('#led'+id).addClass('on');
+							$('#button'+id).addClass('on');
+							setPitButton(i, 2);
+							break;
+					}
+				}
+
+	            // automatically refresh UI each seconds
+	            setTimeout(startLEDTimer, 300);
+			}
+
+			function setPitButton(index, value) {
+				$.post('/macros/setPitButton/' + index + ',' + value)
+					.done(function(response) {
+		                try {
+		                }
+		                catch (err) {
+		                }
+		        	});
+			}
+
+	        function startUpdateTimer() {
+		        $.post('/macros/getCarInfo/False,True')
+					.done(function(response) {
+		                try {
+							var json = $.parseJSON(response);
+							var buttons = json["buttons"];
+							if (buttons) {
+								for (var i=0, len=buttons.length; i<len; i++) {
+									// console.log("Led " + i + " changed to " + buttons[i]);
+									if (buttons[i] != leds[i]) {
+										leds[i] = buttons[i];
+									}
+								}
+							}
+		                }
+		                catch (err) {
+		                }
+		        	});
+
+		            // automatically refresh UI each seconds
+		            setTimeout(startUpdateTimer, 1000);
+	        }
+
+			// handle car buttons light changes
+			startLEDTimer();
+
+            // automatically refresh UI each seconds
+            startUpdateTimer();
+		});
+	</script>
+</head>
+<body>
+	<section>
+		<a href="#" class="button" id="button1">&#xF015;</a>
+		<span class="led" id="led1"></span>
+	</section>
+	<section>
+		<a href="#" class="button" id="button2">&#xF0e4;</a>
+		<span class="led" id="led2"></span>
+	</section>
+	<section>
+		<a href="#" class="button" id="button3">&#xF071;</a>
+		<span class="led" id="led3"></span>
+	</section>
+	<section>
+		<a href="#" class="button" id="button4">&#xF024;</a>
+		<span class="led" id="led4"></span>
+	</section>
+	<br style="clear:left;" />
+	<section>
+		<a href="#" class="button" id="button5">&#xF024;</a>
+		<span class="led" id="led5"></span>
+	</section>
+	<section>
+		<a href="#" class="button" id="button6">&#xF043;</a>
+		<span class="led" id="led6"></span>
+	</section>
+	<section>
+		<a href="#" class="button" id="button7">&#xF0ad;</a>
+		<span class="led" id="led7"></span>
+	</section>
+	<section>
+		<a href="#" class="button" id="button8">&#xF06d;</a>
+		<span class="led" id="led8"></span>
+	</section>
+</body>

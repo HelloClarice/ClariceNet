@@ -1,0 +1,79 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+<head>
+    <meta application-name="Clarice" data-min-size="4,2" />
+	<link rel="stylesheet" type="text/css" href="style.css" media="screen" >
+    <script type="text/javascript" src="/jquery.js"></script>
+    <script type="text/javascript" src="/webiopi.js"></script>
+	<script>
+
+	    $(document).ready(function() {
+			$("#output").text("Hello Clarice!" + "\n");
+
+	        function sendMessage() {
+	            var data = $("#inputText").val();
+				data = data.replace(/^\s\s*/, '').replace(/\s\s*$/, '');
+	            if (data.length > 0) {
+					// append new text
+	                var d = $("#output").text() + " > " + data + "\n";
+	                $("#output").text(d);
+
+					// scroll to bottom
+    				$('#output').scrollTop($('#output')[0].scrollHeight);
+
+					console.log(data);
+	                webiopi().callMacro("sendMessage", data, readAnswer);
+	            }
+	            // webiopi().Serial($("#devices").val()).write(data);
+	            $("#inputText").val("");
+	        }
+
+	        var answerTimeout = null;
+	        function readAnswer() {
+	            if (answerTimeout) {
+	                clearTimeout(answerTimeout)
+					answerTimeout = null;
+	            }
+
+	            webiopi().callMacro("getAnswer", null, function(macro, args, data) {
+	                if (data.length > 0) {
+	                    var d = $("#output").text() + data + "\n";
+	                    $("#output").text(d);
+	                } else {
+	                    answerTimeout = setTimeout(readAnswer, 1000);
+	                }
+	            });
+	        }
+
+            $("#inputText").keyup(function(event){
+                if(event.keyCode == 13){
+					$("#inputText").blur();
+					event.preventDefault();
+                    sendMessage();
+                }
+            });
+		});
+	</script>
+</head>
+<body>
+
+	<div class="container">
+		<section class="editorWrap">
+			<h1 >Clarice Communication Layer</h1>
+			<div class="editor">
+				<div class="menu"></div><!-- end .menu -->
+				<div class="code">
+					<textarea id="output" class="text" readonly></textarea><br/>
+				</div>
+			</div>
+		</section>
+		<p>&nbsp;</p>
+		<div class="question">
+			<div>
+				<label for="pub_url">Question:</label>
+				<input type="text" id="inputText" name="pub_url" value="">
+			</div>
+		</div>
+	</div>
+</body>
