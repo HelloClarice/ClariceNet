@@ -10,11 +10,12 @@
 *
 * led state (HIGH = on, LOW = off) is managed with ledState
 */
-typedef struct
-{ 
-  //start off with 0, if pressed goes to 1, when pit responds with 1, go to 2
+typedef struct { 
+  // last read button pin state.
+  int pinState;
+  // start off with 0, if pressed goes to 1, when pit responds with 1, go to 2
   int carState;
-  //start with 0, just reflect whatever the pit says
+  // start with 0, just reflect whatever the pit says
   int pitState;
 } Button;
 
@@ -28,8 +29,7 @@ typedef struct
 const int lcdMessageLength = 80;
 const int rows = 4;
 const int columns = 20;
-typedef struct
-{ 
+typedef struct { 
   char message[lcdMessageLength];
   
   //has to be 21, so we can end with \0
@@ -39,7 +39,7 @@ typedef struct
   char line2[columns+1];
   char line3[columns+1];
   char line4[columns+1];
-
+  
   int startupCount;
 
   //set when a new message has been added
@@ -84,8 +84,7 @@ void writeLine(LCDDisplay *lcdDisplay, char line[], int lineNumber)
 void clearLine(LCDDisplay *lcdDisplay, int lineNumber)
 {
   char line[columns+1];
-  for (int i = 0; i < columns; i++)
-  {
+  for (int i = 0; i < columns; i++) {
     line[i] = ' ';
   }
   line[columns]='\0';
@@ -99,19 +98,16 @@ void clearLine(LCDDisplay *lcdDisplay, int lineNumber)
 **********************************************************************************/
 void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
 {
-  if(lcdDisplay->newMessage == 1)
-  {
+  if (lcdDisplay->newMessage == 1) {
     //convert to line by line message for display below
     int msgPos = 0;
-    for (int i = 0; i < rows; i++)
-    {
+    for (int i = 0; i < rows; i++) {
       char line[columns+1];
       line[0]='\0';
+      
       int lineLen = 0;
-      for (int j = 0; j < columns; j++)
-      {
-        if((msgPos <= lcdMessageLength) && (lcdDisplay->message[msgPos]!='\0'))
-        {
+      for (int j = 0; j < columns; j++) {
+        if ((msgPos <= lcdMessageLength) && (lcdDisplay->message[msgPos]!='\0')) {
           line[j]=lcdDisplay->message[msgPos];
           msgPos++;
           lineLen++;
@@ -123,11 +119,11 @@ void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
     }
   }
 
-  if(lcdDisplay->newMessage == 1)
-  {
+  if (lcdDisplay->newMessage == 1) {
     lcdDisplay->newMessage=0;
     lcd->clear();
   }
+  
   //for each line in lcd display, show it.
   lcd->setCursor(0,0);
   lcd->print(lcdDisplay->line1);
@@ -148,8 +144,7 @@ void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
 * All durations are actually number of loop counts. So if the loop delays for 50ms, a duration of 2 
 * means 2 loops (or 100ms)
 **/
-typedef struct
-{
+typedef struct {
   //how many loops should the light be on
   int onDuration; 
   //how many loops should the light be off
@@ -178,34 +173,30 @@ typedef struct
 **********************************************************************************/
 int blinkLED(BlinkCycle *blinkCycle)
 {
-    if(!blinkCycle->maxOut  || (blinkCycle->maxCycles >= blinkCycle->currentCycle))
-    {
-        blinkCycle->currentDuration++;
+    if (!blinkCycle->maxOut  || (blinkCycle->maxCycles >= blinkCycle->currentCycle)) {
+      blinkCycle->currentDuration++;
         
-        // This code block blinks the LED at the Speed
-        //basically if we've hit the countdown for the cycle
-        //reset and change the state from low to high or reverse
-        if(blinkCycle->currentState == HIGH && (blinkCycle->currentDuration >= blinkCycle->onDuration))
-        {
-          blinkCycle->currentState = LOW;
-          blinkCycle->currentDuration = 0;
+      // This code block blinks the LED at the Speed
+      //basically if we've hit the countdown for the cycle
+      //reset and change the state from low to high or reverse
+      if (blinkCycle->currentState == HIGH && (blinkCycle->currentDuration >= blinkCycle->onDuration)) {
+        blinkCycle->currentState = LOW;
+        blinkCycle->currentDuration = 0;
+      }
+      else if (blinkCycle->currentState == LOW && (blinkCycle->currentDuration >= blinkCycle->offDuration)) {
+        blinkCycle->currentState = HIGH;
+          
+        //increment cycle count if we care about max cycles
+        if (blinkCycle->maxOut) {
+          blinkCycle->currentCycle++;
         }
-        else if(blinkCycle->currentState == LOW && (blinkCycle->currentDuration >= blinkCycle->offDuration))
-        {
-          blinkCycle->currentState = HIGH;
-          //increment cycle count if we care about max cycles
-          if(blinkCycle->maxOut)
-          {
-            blinkCycle->currentCycle++;
-          }
-          blinkCycle->currentDuration = 0;
-        }
+        blinkCycle->currentDuration = 0;
+      }
     }
-    else
-    {
-       //we're past the countdown, turn LED off
-       blinkCycle->currentState = blinkCycle->endState;
-    }
+    else {
+     //we're past the countdown, turn LED off
+     blinkCycle->currentState = blinkCycle->endState;
+   }
     
 //    Serial.print("state: on");
 //    Serial.print(blinkCycle->onDuration);
@@ -221,14 +212,13 @@ int blinkLED(BlinkCycle *blinkCycle)
 //    Serial.print(blinkCycle->currentDuration);
 //    Serial.print(", ");
 //    Serial.println(blinkCycle->currentState);
-    return blinkCycle->currentState;     
+  return blinkCycle->currentState;     
 }
 
 int reverseLED(int state)
 {
   int result = HIGH;
-  if(state == HIGH)
-  {
+  if (state == HIGH) {
     result = LOW;
   }
   return result;

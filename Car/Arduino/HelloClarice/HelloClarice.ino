@@ -38,16 +38,13 @@ From the info above, the format for data should look like:
 /**
 * common values like LED blink lengths
 **/
-const int LEDshort = 2;
-const int LEDmedium = 6;
-const int LEDlong = 9;
-const int LCDack = 20;
-const int commCount = 20;
-int currentCommCount = commCount;
-int counter = 0;
+const int LED_SHORT = 2;
+const int LED_MEDIUM = 6;
+const int LED_LONG = 9;
+const int LCD_ACK = 20;
 
 /**
-* Serial
+* serial Communication via XBee
 **/
 SoftwareSerial mySerial(10,11); // RX, TX
 Messenger messenger = Messenger(','); 
@@ -59,47 +56,46 @@ void messageReady();
 **/
 LiquidCrystal lcd(12, 7, 6, 5, 4, 3, 2);
 int lcdBackLight = 13;    // pin 13 will control the backlight
-const int LCDcycleSpeed = LEDshort;
+const int LCD_CYCLE_SPEED = LED_SHORT;
 LCDDisplay lcdDisplay = {"", " Hello, Clarice....", "   Tell me about","    the silence ","    of the  cams", 100, 0, 1, HIGH};
-BlinkCycle lcdBlink = {LCDack, 1, true, 50, HIGH, HIGH, 0, 0};
+BlinkCycle lcdBlink = {LCD_ACK, 1, true, 50, HIGH, HIGH, 0, 0};
 
 /**
 * comms button data
 **/
-const int commButtonCount = 10;
-int commButtonPins[commButtonCount] = {22,24,26,28,30,32,34,36,38,40};
-int commLEDPins[commButtonCount] = {23,25,27,29,31,33,35,37,39,41};
-Button commButtons[commButtonCount];
-const int recvdAckCount = 50;
-BlinkCycle ledAck = {LEDmedium, LEDmedium, false, 0, HIGH, HIGH, 0, 0};
-BlinkCycle yesnoBlink = {LEDshort, LEDshort, false, 0, LOW, HIGH, 0, 0};
-BlinkCycle yesnoAck = {LEDlong, 1, true, 2, LOW, HIGH, 0, 0};
+const int COMM_BUTTON_COUNT = 10;
+int commButtonPins[COMM_BUTTON_COUNT] = {22, 24, 26, 28, 30, 32, 34, 36, 38, 40};
+int commLEDPins[COMM_BUTTON_COUNT] = {23, 25, 27, 29, 31, 33, 35, 37, 39, 41};
+Button commButtons[COMM_BUTTON_COUNT];
+BlinkCycle ledAck = {LED_MEDIUM, LED_MEDIUM, false, 0, HIGH, HIGH, 0, 0};
+BlinkCycle yesnoBlink = {LED_SHORT, LED_SHORT, false, 0, LOW, HIGH, 0, 0};
+BlinkCycle yesnoAck = {LED_LONG, 1, true, 2, LOW, HIGH, 0, 0};
 
 /**
 * raw data from sensors
 **/
-const int sensorCount = 4;
-//MOCK DATA
-int sensors[sensorCount] = {123, 456, 678, 900};
+const int COMM_SENSOR_COUNT = 4;
+int sensors[COMM_SENSOR_COUNT] = {123, 456, 678, 900}; //MOCK DATA
 
 /**
 Application state. Describe status of acknowledgements, what display should show, which buttons should be lit, etc
 **/
 // number of buttons,   number separators, length of message
-const int inputLength = commButtonCount + commButtonCount + lcdMessageLength; 
+//const int inputLength = COMM_BUTTON_COUNT + COMM_BUTTON_COUNT + lcdMessageLength; 
 int noDataReceived = 0;
+int lastSentDataTime = 0;
 
 /**********************************************************************************
 * Initialize the LCD and communication
 **********************************************************************************/
 void setup() 
- {
-    for (int i=0; i<commButtonCount; i++)
-    {
-      Button b = {0, 0};
+{
+    for (int i=0; i<COMM_BUTTON_COUNT; i++) {
+      Button b = {LOW, 0, 0};
       commButtons[i] = b;
       pinMode(commLEDPins[i], OUTPUT);
     }
+    
     // columns, rows.  use 16,2 for a 16x2 LCD, etc.
     lcd.begin(columns, rows);
     showMessage(&lcd, &lcdDisplay);
@@ -178,24 +174,23 @@ boolean verifyChecksum(const char* message)
   return (checksum == atoi(str)) ? true : false;
 }
 
-void messageReady() {
+void messageReady() 
+{
 //  Serial.print("Message received. Lag: ");
 //  Serial.println(noDataReceived);
   noDataReceived = 0;
   
   char line[lcdMessageLength];
   messenger.copyBuffer(line, lcdMessageLength);
-  if (!verifyChecksum(line))
-  {
+  if (!verifyChecksum(line)) {
     Serial.print("invalid checksum for new line: ");
     Serial.println(line);
     return;
   }
   
   // read button states as seen by pit in a temp value
-  int states[commButtonCount];
-  for (int i=0; i<commButtonCount; i++) 
-  {
+  int states[COMM_BUTTON_COUNT];
+  for (int i=0; i<COMM_BUTTON_COUNT; i++) {
       if (!messenger.available()) {
         Serial.println("invalid line");
         return;
@@ -203,36 +198,33 @@ void messageReady() {
       states[i] = messenger.readInt();
   }
   
-  // update all states
-  for (int i=0; i<commButtonCount; i++) 
-  {
+  // update button pit states from received message
+  for (int i=0; i<COMM_BUTTON_COUNT; i++) {
     commButtons[i].pitState = states[i];
   }
   
-  // read question if any
+  // parse question if any was added to the message
   char message[lcdMessageLength];
   boolean messageReceived = false;
-  if (messenger.available()) 
-  { 
+  if (messenger.available()) { 
     messenger.copyString(message, lcdMessageLength);
     messageReceived = true;
     // TODO handle comma
   }
     
+  // remove checksum component from question
   char* p = message;
   char *str = strtok_r(p, ";", &p); // delimiter for checksum is the semicolon
-  if (!messageReceived || message[0] == 0 || message[0] == ';' || !str || str[0] == 0) 
-  {
+  if (!messageReceived || message[0] == 0 || message[0] == ';' || !str || str[0] == 0) {
 //    Serial.println("No new question.");
     return;
   }
   
+  // determine if question is new
   boolean same = true;  
   int i = 0;
-  while (i<lcdMessageLength && str[i] != 0) 
-  {
-    if (lcdDisplay.message[i] != str[i] && same)
-    {
+  while (i<lcdMessageLength && str[i] != 0) {
+    if (lcdDisplay.message[i] != str[i] && same) {
       same = false;
       lcdDisplay.responded = 0;
       lcdDisplay.newMessage = 1;
@@ -243,16 +235,14 @@ void messageReady() {
     i++;
   } 
   
-  if (!same)
-  {
+  if (!same) {
     Serial.print("New question received: ");
     Serial.println(str);
     Serial.print("Message: ");
     Serial.println(message);
   }
   
-  if (i > 0 && i <= lcdMessageLength)
-  {
+  if (i > 0 && i <= lcdMessageLength) {
     lcdDisplay.message[i] = '\0'; // Null terminate the string
   }
 }
@@ -264,13 +254,11 @@ void messageReady() {
 void sendData() 
 {
   String output = "";
-  for (int i=0; i<sensorCount; i++) 
-  {
+  for (int i=0; i<COMM_SENSOR_COUNT; i++) {
     output += sensors[i];
     output += ",";
   }
-  for (int i=0; i<commButtonCount; i++) 
-  {
+  for (int i=0; i<COMM_BUTTON_COUNT; i++) {
     output += commButtons[i].carState;
     output += ",";
   }
@@ -286,31 +274,26 @@ void writeLCD()
 {
   // if still in startup mode (showing nice text), 
   // just skip touching the LCD
-  if (lcdDisplay.startupCount > 0)
-  {
+  if (lcdDisplay.startupCount > 0) {
     lcdDisplay.startupCount--;
     //reset the message
-    if (lcdDisplay.startupCount == 0)
-    {
+    if (lcdDisplay.startupCount == 0) {
       resetLCD(&lcdDisplay);
       lcd.clear();
     }
   }
   
   //Show non startup message
-  if (lcdDisplay.startupCount <= 0)
-  {
+  if (lcdDisplay.startupCount <= 0) {
     //if waiting for a response, need to occasionally blink the LCD
-    if (lcdDisplay.responded == 0)
-    {
+    if (lcdDisplay.responded == 0) {
        digitalWrite(lcdBackLight, blinkLED(&lcdBlink));
        int yesState = blinkLED(&yesnoBlink);
        int noState = reverseLED(yesState);
        digitalWrite(commLEDPins[8], yesState);
        digitalWrite(commLEDPins[9], noState);
     }
-    else
-    {
+    else {
       digitalWrite(lcdBackLight, lcdDisplay.light);    
       //reset this afer a question
       lcdBlink.currentCycle = 0;
@@ -321,17 +304,14 @@ void writeLCD()
       text2.toCharArray(lcdDisplay.line2, 21);
       
       //show comms issues if there are some
-      if (noDataReceived > 10)
-      {
+      if (noDataReceived > 10) {
         String text="No pit data: ";
         String toShow = text + noDataReceived;
         toShow.toCharArray(lcdDisplay.line4, 21);
       }
-      else
-      {
+      else {
         clearLine(&lcdDisplay, 3);
       }
-      
     }
     showMessage(&lcd, &lcdDisplay);
   }
@@ -346,77 +326,57 @@ void checkButtons()
    int buttonAckState = blinkLED(&ledAck);
    int yesNoAckState = blinkLED(&yesnoAck);
   
-   for (int i = 0; i < commButtonCount; i++)
-   {
-      //if we received a pit ack, change car state to 2
-      if (commButtons[i].pitState == 1 && commButtons[i].carState == 1)
-      {
+   for (int i = 0; i < COMM_BUTTON_COUNT; i++) {
+      // if we received a pit ack, change car state to 2
+      if (commButtons[i].pitState == 1 && commButtons[i].carState == 1) {
         commButtons[i].carState = 2;
       }
 
       // read the state of the pushbutton value:
       //need to go through each one, then print state
       //for the LED in the array
-      int buttonState = digitalRead(commButtonPins[i]);    
-      if (buttonState == HIGH) 
-      {  
-        //stop this up a bit so we can process and know
-        //we're not processing the same push again
-        while (digitalRead(commButtonPins[i]) == HIGH)
-        {
-          delay(50);
-        }
-        //a bit more, just to keep it straight
-        delay(50);
-
+      int currentPinState = digitalRead(commButtonPins[i]);    
+      if (currentPinState == HIGH && commButtons[i].pinState == LOW)  {  
         //if this is an LCD response, let the LCD know
-        if (i==8 || i==9)
-        {
+        if (i==8 || i==9) {
           lcdDisplay.responded = 1;
         }
         
         //start with no pushed button
-        if (commButtons[i].carState == 0)
-        {
+        if (commButtons[i].carState == 0) {
           commButtons[i].carState = 1;
           commButtons[i].pitState = 0;          
         }
         //Stop sending, we don't care and are resetting
-        else if (commButtons[i].carState == 1)
-        {
+        else if (commButtons[i].carState == 1) {
           commButtons[i].carState = 0;
         }
         //only reset if there is a pit ack
-        else if (commButtons[i].carState == 2 && commButtons[i].pitState > 0)
-        {
+        else if (commButtons[i].carState == 2 && commButtons[i].pitState > 0) {
           commButtons[i].carState = 0;
           commButtons[i].pitState = 0;          
         }
       } 
+      commButtons[i].pinState = currentPinState;
       
-     //if we're showing a button push, but havent received an acknowledgement, show blinking LED
-     if (commButtons[i].carState == 1)
-     {
-         digitalWrite(commLEDPins[i], buttonAckState);
-     }
-     //we've received an acknowledgement, now note that with solid
-     else if (commButtons[i].carState == 2)
-     {
+      //if we're showing a button push, but havent received an acknowledgement, show blinking LED
+      if (commButtons[i].carState == 1) {
+        digitalWrite(commLEDPins[i], buttonAckState);
+      }
+      //we've received an acknowledgement, now note that with solid
+      else if (commButtons[i].carState == 2) {
         //yes/no button? 
-        if (i==8 || i==9)
-        {
+        if (i==8 || i==9) {
           digitalWrite(commLEDPins[i], LOW);
           commButtons[i].carState = 0;
         }
-        else
-        {
+        else {
           digitalWrite(commLEDPins[i], HIGH);
         }
-     }
-     else 
-     {
-          // turn LED off:
-          digitalWrite(commLEDPins[i], LOW); 
+      }
+      else {
+        // turn LED off:
+        digitalWrite(commLEDPins[i], LOW); 
       }
    }
 }
@@ -427,8 +387,6 @@ void checkButtons()
 **********************************************************************************/
 void loop()
 {
-  currentCommCount--;
-  
   // The following line is the most effective way of using Serial and Messenger's callback
   while (mySerial.available())  {
     messenger.process(mySerial.read());
@@ -438,13 +396,13 @@ void loop()
   checkButtons();
   writeLCD();
   
-  if (currentCommCount <= 0)
-  {
-    //this gets reset when processed by messenger
-     noDataReceived++;
-     currentCommCount = commCount;
-     sendData();
+  int now = millis();
+  if (now-lastSentDataTime >= 1000) {
+    sendData();
+     
+    lastSentDataTime = now;
+    noDataReceived++; //this gets reset when new message is received
   }
-  delay(50);
+  delay(10);
 }
  
