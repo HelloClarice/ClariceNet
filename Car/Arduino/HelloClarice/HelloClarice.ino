@@ -47,7 +47,7 @@ const int LCD_ACK = 20;
 * serial Communication via XBee
 **/
 SoftwareSerial mySerial(10,11); // RX, TX
-Messenger messenger = Messenger(','); 
+Messenger messenger = Messenger('|'); 
 void messageReady();
 
 /**
@@ -130,49 +130,36 @@ void setupXbee()
   messenger.attach(messageReady);
 }
 
+long hash(long sum) 
+{
+   return ((-1 * sum) % 256) & 0xFF;
+}
+
+long calculateChecksum(String input)
+{
+  long checksum = 0;
+  int i = 0;
+  char c;
+  while ((c = input[i++]) != '\0') {
+    checksum += (int)c;
+  }
+  return hash(checksum);
+}
+
+long calculateChecksum(const char* input)
+{
+  long checksum = 0;
+  char* p = (char*)input;
+  while (*p != '\0') {
+    checksum += (int)*p;
+    ++p;
+  }
+  return hash(checksum);
+}
+
 /**********************************************************************************
 * Read incoming serial data and marshal into the input array
 **********************************************************************************/
-
-boolean verifyChecksum(const char* message)
-{
-  Serial.print("Calculating checksum for line: ");
-  Serial.println(message);
-  
-  // Separate checksum from message
-  char *p = (char*)message;
-  char *str;
-  if ((str = strtok_r(p, ";", &p)) == NULL) // delimiter for checksum is the semicolon
-    return false;
-    
-//  Serial.print("Message: ");
-//  Serial.println(str);
-  
-  // calculate checksum from message
-  int checksum = 0;
-  int i = 0;
-  char c;
-  while ((c = str[i++]) != 0) {
-    checksum += (int)c;
-  }
-  checksum = ((-1 * checksum) % 256) & 0xFF;
-
-//  Serial.println(checksum);
-    
-  // Extract checksum from line
-  str = strtok_r(p, ";", &p);
-  if (!str) 
-  {
-    Serial.println("Found checksum delimiter but no checksum");
-    return false;
-  }
-  
-//  Serial.print("Line checksum: ");
-//  Serial.println(str);
-  
-  // Compare checksum
-  return (checksum == atoi(str)) ? true : false;
-}
 
 void messageReady() 
 {
@@ -180,10 +167,19 @@ void messageReady()
 //  Serial.println(noDataReceived);
   noDataReceived = 0;
   
+  // extract checksum
+  long checksum = messenger.readLong();
+  
+  // verify message checksum
   char line[lcdMessageLength];
-  messenger.copyBuffer(line, lcdMessageLength);
-  if (!verifyChecksum(line)) {
-    Serial.print("invalid checksum for new line: ");
+  messenger.copyString(line, lcdMessageLength);
+  long calc_checksum = calculateChecksum(line); 
+  if (checksum != calc_checksum) {
+    Serial.print("invalid checksum for new line ");
+    Serial.print(checksum);
+    Serial.print("/");
+    Serial.print(calc_checksum);
+    Serial.print("/");
     Serial.println(line);
     return;
   }
@@ -204,49 +200,48 @@ void messageReady()
   }
   
   // parse question if any was added to the message
-  char message[lcdMessageLength];
+  char question[lcdMessageLength];
   boolean messageReceived = false;
   if (messenger.available()) { 
-    messenger.copyString(message, lcdMessageLength);
+    messenger.readString(question, lcdMessageLength);
     messageReceived = true;
-    // TODO handle comma
   }
     
-  // remove checksum component from question
-  char* p = message;
-  char *str = strtok_r(p, ";", &p); // delimiter for checksum is the semicolon
-  if (!messageReceived || message[0] == 0 || message[0] == ';' || !str || str[0] == 0) {
+  if (!messageReceived || question[0] == 0) {
 //    Serial.println("No new question.");
     return;
   }
   
-  // determine if question is new
+  // parse question
   boolean same = true;  
   int i = 0;
-  while (i<lcdMessageLength && str[i] != 0) {
-    if (lcdDisplay.message[i] != str[i] && same) {
+  while (i<lcdMessageLength) {
+    // update UI state if question is new
+    if (lcdDisplay.message[i] != question[i]) {
       same = false;
       lcdDisplay.responded = 0;
       lcdDisplay.newMessage = 1;
       commButtons[8].carState = 0;
       commButtons[9].carState = 0;
     }
-    lcdDisplay.message[i] = str[i];
+    
+    lcdDisplay.message[i] = question[i];
+    if (question[i] == '\0') 
+      break;
+    
     i++;
   } 
   
+  // null terminate
+  lcdDisplay.message[lcdMessageLength-1] = '\0';
+  
   if (!same) {
     Serial.print("New question received: ");
-    Serial.println(str);
+    Serial.println(question);
     Serial.print("Message: ");
-    Serial.println(message);
-  }
-  
-  if (i > 0 && i <= lcdMessageLength) {
-    lcdDisplay.message[i] = '\0'; // Null terminate the string
+    Serial.println(line);
   }
 }
-
 
 /**********************************************************************************
 * Send sensor data and button data to the Serial
@@ -255,13 +250,22 @@ void sendData()
 {
   String output = "";
   for (int i=0; i<COMM_SENSOR_COUNT; i++) {
+    if (i>0) {
+      output += "|";
+    }
     output += sensors[i];
-    output += ",";
   }
   for (int i=0; i<COMM_BUTTON_COUNT; i++) {
+    if (i>=0 && output.length() > 0) {
+      output += "|";
+    }
     output += commButtons[i].carState;
-    output += ",";
   }
+  
+  // prepend checksum
+  long checksum = calculateChecksum(output);
+  output = String(checksum) + "|" + output;
+  
   Serial.println("Sending: " + output);
   mySerial.println(output);
 }
@@ -396,12 +400,13 @@ void loop()
   checkButtons();
   writeLCD();
   
+  // send new data every sec only
   int now = millis();
   if (now-lastSentDataTime >= 1000) {
     sendData();
      
     lastSentDataTime = now;
-    noDataReceived++; //this gets reset when new message is received
+    noDataReceived++; // this gets reset when new message is received
   }
   delay(10);
 }

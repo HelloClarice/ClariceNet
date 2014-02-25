@@ -18,11 +18,12 @@ public:
   Messenger();
   Messenger(char separator);
   void copyBuffer(char *string, uint8_t size);
+  void copyString(char *string, uint8_t size);
   int readInt();
   long readLong(); // Added based on a suggestion by G. Paolo Sani
   char readChar();
   double readDouble(); // Added based on a suggestion by Lorenzo C.
-  void copyString(char *string, uint8_t size);
+  void readString(char *string, uint8_t size);
   uint8_t checkString(char *string);
   uint8_t process(int serialByte);
   uint8_t available();

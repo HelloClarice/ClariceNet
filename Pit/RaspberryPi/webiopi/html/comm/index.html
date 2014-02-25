@@ -23,7 +23,7 @@
     				$('#output').scrollTop($('#output')[0].scrollHeight);
 
 					console.log(data);
-	                webiopi().callMacro("sendMessage", data, readAnswer);
+	                webiopi().callMacro("sendMessage", encodeURIComponent(data), readAnswer);
 	            }
 	            // webiopi().Serial($("#devices").val()).write(data);
 	            $("#inputText").val("");
