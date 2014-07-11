@@ -15,11 +15,16 @@ Then we learn about ZigBee or XBee.
 
 The system we put in place works like this
 
-Car
-  Buttons on the dash + LCD hooked to Arduino
-  Arduino interfaces with an XBee shield
+#Car
+  Sensors + Buttons on the dash + LCD hooked to Arduino
+  Arduino interfacing with an XBee shield
   
-Pit
+#Pit
   XBee shield connected to Raspberry Pi
   WiFi dongle connected to Raspberry Pi configured as access point
-  iPad running StatusBoard connected to Raspberry Pi access point
+  iPad running Status Board connected to Raspberry Pi access point
+
+![Status Board](/statusboard.jpg)
+
+For more info on our team
+https://www.tumblr.com/blog/raceclarice#
