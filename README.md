@@ -16,15 +16,23 @@ Then we learn about ZigBee or XBee.
 The system we put in place works like this
 
 #Car
-  Sensors + Buttons on the dash + LCD hooked to Arduino
-  Arduino interfacing with an XBee shield
+* Sensors + Buttons on the dash + LCD hooked to Arduino
+* Arduino interfacing with an XBee shield
   
 #Pit
-  XBee shield connected to Raspberry Pi
-  WiFi dongle connected to Raspberry Pi configured as access point
-  iPad running Status Board connected to Raspberry Pi access point
+* XBee shield connected to Raspberry Pi
+* WiFi dongle connected to Raspberry Pi configured as access point
+* iPad running Status Board connected to Raspberry Pi access point
 
 ![Status Board](/statusboard.jpg)
+
+#Usage
+Pit can monitor sensors in real time and communicate to drivers by typing a question on the iPad.
+Driver sees question show up on the LCD in the car and responds with "YES" or "NO" by pressing a button on the Left or Right of the wheel to acknowledge it. Additionally, the driver can press more buttons on the dash to reflect current situations or problems which are immediately reflected on the status board with blinking leds. Pit can acknowledge reception by pressing the corresponding buttons.
+
+#Codebase
+* Pi: webpi, python
+* Arduino: ...
 
 For more info on our team
 https://www.tumblr.com/blog/raceclarice#
