@@ -23,7 +23,8 @@ The system we put in place works like this
 * XBee shield connected to Raspberry Pi
 * WiFi dongle connected to Raspberry Pi configured as access point
 * iPad running Status Board connected to Raspberry Pi access point
-
+![Status Board](/rpi+xbee.jpg)
+![Status Board](/pit-in-a-box.jpg)
 ![Status Board](/statusboard.jpg)
 
 #Usage
