@@ -24,7 +24,6 @@ The system we put in place works like this
 * WiFi dongle connected to Raspberry Pi configured as access point
 * iPad running Status Board connected to Raspberry Pi access point
 ![Status Board](/rpi+xbee.jpg)
-![Status Board](/pit-in-a-box.jpg)
 ![Status Board](/statusboard.jpg)
 
 #Usage
@@ -33,7 +32,7 @@ Driver sees question show up on the LCD in the car and responds with "YES" or "N
 
 #Codebase
 * Pi: webpi, python
-* Arduino: ...
+* Arduino
 
 For more info on our team
 https://www.tumblr.com/blog/raceclarice#
