@@ -173,7 +173,7 @@ typedef struct {
 **********************************************************************************/
 int blinkLED(BlinkCycle *blinkCycle)
 {
-    if (!blinkCycle->maxOut  || (blinkCycle->maxCycles >= blinkCycle->currentCycle)) {
+    if (!blinkCycle->maxOut || (blinkCycle->maxCycles >= blinkCycle->currentCycle)) {
       blinkCycle->currentDuration++;
         
       // This code block blinks the LED at the Speed
@@ -217,9 +217,5 @@ int blinkLED(BlinkCycle *blinkCycle)
 
 int reverseLED(int state)
 {
-  int result = HIGH;
-  if (state == HIGH) {
-    result = LOW;
-  }
-  return result;
+  return state == HIGH ? LOW : HIGH;
 }

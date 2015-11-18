@@ -4,7 +4,6 @@
 
 #include "ClariceComponents.h"
 
-
 /**
 General communication starts being read from the serial connection which results in:
  - If there are no acknowledgements received or previous button pushes sent
@@ -58,7 +57,7 @@ LiquidCrystal lcd(12, 7, 6, 5, 4, 3, 2);
 int lcdBackLight = 13;    // pin 13 will control the backlight
 const int LCD_CYCLE_SPEED = LED_SHORT;
 LCDDisplay lcdDisplay = {"", " Hello, Clarice....", "   Tell me about","    the silence ","    of the  cams", 100, 0, 1, HIGH};
-BlinkCycle lcdBlink = {LCD_ACK, 1, true, 50, HIGH, HIGH, 0, 0};
+BlinkCycle lcdBlink = {LED_LONG, LED_LONG, true, 50, HIGH, HIGH, 0, 0};
 
 /**
 * comms button data
@@ -68,7 +67,7 @@ int commButtonPins[COMM_BUTTON_COUNT] = {22, 24, 26, 28, 30, 32, 34, 36, 38, 40}
 int commLEDPins[COMM_BUTTON_COUNT] = {23, 25, 27, 29, 31, 33, 35, 37, 39, 41};
 Button commButtons[COMM_BUTTON_COUNT];
 BlinkCycle ledAck = {LED_MEDIUM, LED_MEDIUM, false, 0, HIGH, HIGH, 0, 0};
-BlinkCycle yesnoBlink = {LED_SHORT, LED_SHORT, false, 0, LOW, HIGH, 0, 0};
+BlinkCycle yesnoBlink = {LED_MEDIUM, LED_MEDIUM, false, 0, LOW, HIGH, 0, 0};
 BlinkCycle yesnoAck = {LED_LONG, 1, true, 2, LOW, HIGH, 0, 0};
 
 /**
@@ -83,7 +82,7 @@ Application state. Describe status of acknowledgements, what display should show
 // number of buttons,   number separators, length of message
 //const int inputLength = COMM_BUTTON_COUNT + COMM_BUTTON_COUNT + lcdMessageLength; 
 int noDataReceived = 0;
-int lastSentDataTime = 0;
+unsigned long lastSentDataTime = 0;
 
 /**********************************************************************************
 * Initialize the LCD and communication
@@ -337,8 +336,8 @@ void checkButtons()
       }
 
       // read the state of the pushbutton value:
-      //need to go through each one, then print state
-      //for the LED in the array
+      // need to go through each one, then print state
+      // for the LED in the array
       int currentPinState = digitalRead(commButtonPins[i]);    
       if (currentPinState == HIGH && commButtons[i].pinState == LOW)  {  
         //if this is an LCD response, let the LCD know
@@ -363,17 +362,18 @@ void checkButtons()
       } 
       commButtons[i].pinState = currentPinState;
       
-      //if we're showing a button push, but havent received an acknowledgement, show blinking LED
+      // if we're showing a button push, but havent received an acknowledgement, show blinking LED
       if (commButtons[i].carState == 1) {
         digitalWrite(commLEDPins[i], buttonAckState);
       }
-      //we've received an acknowledgement, now note that with solid
+      // we've received an acknowledgement
       else if (commButtons[i].carState == 2) {
-        //yes/no button? 
+        // yes/no buttons blinks for a few cycles
         if (i==8 || i==9) {
           digitalWrite(commLEDPins[i], LOW);
           commButtons[i].carState = 0;
         }
+        // blinking leds stay solid until button pushed again
         else {
           digitalWrite(commLEDPins[i], HIGH);
         }
@@ -396,13 +396,13 @@ void loop()
     messenger.process(mySerial.read());
   }
   
-  //add all the buttons here
+  // add all the buttons here
   checkButtons();
   writeLCD();
   
-  // send new data every sec only
+  // send new data every 1/2 sec only
   int now = millis();
-  if (now-lastSentDataTime >= 1000) {
+  if (now-lastSentDataTime >= 500) {
     sendData();
      
     lastSentDataTime = now;
