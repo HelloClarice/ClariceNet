@@ -61,7 +61,7 @@ LiquidCrystal lcd(12, 7, 6, 5, 4, 3, 2);
 int lcdBackLight = 13;    // pin 13 will control the backlight
 const int LCD_CYCLE_SPEED = LED_SHORT;
 LCDDisplay lcdDisplay = {"", " Hello, Clarice....", "   Tell me about","    the silence ","    of the  cams", 5000, false, 0, 1, HIGH};
-BlinkCycle lcdBlink = {LED_LONG, LED_LONG, true, 50, HIGH, HIGH, 0, 0};
+BlinkCycle lcdBlink = {LED_LONG, LED_LONG, 50, HIGH, HIGH, 0, 0};
 
 /**
 * comms button data
@@ -70,9 +70,9 @@ const int COMM_BUTTON_COUNT = 10;
 int commButtonPins[COMM_BUTTON_COUNT] = {22, 24, 26, 28, 30, 32, 34, 36, 38, 40};
 int commLEDPins[COMM_BUTTON_COUNT] = {23, 25, 27, 29, 31, 33, 35, 37, 39, 41};
 Button commButtons[COMM_BUTTON_COUNT];
-BlinkCycle ledAck = {LED_MEDIUM, LED_MEDIUM, false, 0, HIGH, HIGH, 0, 0};
-BlinkCycle yesnoBlink = {LED_MEDIUM, LED_MEDIUM, false, 0, LOW, HIGH, 0, 0};
-BlinkCycle yesnoAck = {LED_LONG, 1, true, 2, LOW, HIGH, 0, 0};
+BlinkCycle ledAck = {LED_LONG, LED_LONG, 0, HIGH, HIGH, 0, 0};
+BlinkCycle yesnoBlink = {LED_MEDIUM, LED_MEDIUM, 0, LOW, HIGH, 0, 0};
+BlinkCycle yesnoAck = {LED_LONG, 1, 2, LOW, HIGH, 0, 0};
 Gauge fuelGauge = {500, 0, 0, .05, 100, 443, 0, true};
 Gauge tempGauge = {500, 0, 0, .05, 100, 591, 0, true};
 

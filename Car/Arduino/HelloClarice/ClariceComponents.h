@@ -147,24 +147,23 @@ void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
 * All durations are in ms
 **/
 typedef struct {
-  //how many millis should the light be on
+  // how many millis should the light be on
   unsigned long onDuration;
-  //how many millis should the light be off
+  // how many millis should the light be off
   unsigned long offDuration;
 
-  //store the cycle (on or off) start time for comparison
+  // store the cycle (on or off) start time for comparison
   unsigned long lastTime;
 
-  //if there are max cycles, use them
-  boolean maxOut;
-  //what is the maximum number of cycles (on/off) to walk through
+  // what is the maximum number of cycles (on/off) to walk through
+  // 0 for infinite
   int maxCycles;
     
-  //on / off
+  // on / off
   int endState;
   int currentState;
   
-  //for state management
+  // for state management
   int currentCycle;
 } BlinkCycle;
 
@@ -179,7 +178,7 @@ typedef struct {
 **********************************************************************************/
 int blinkLED(BlinkCycle *blinkCycle, unsigned long time)
 {
-    if (!blinkCycle->maxOut  || (blinkCycle->maxCycles >= blinkCycle->currentCycle))
+    if (blinkCycle->maxCycles == 0  || blinkCycle->maxCycles >= blinkCycle->currentCycle)
     {
       unsigned long elapsedTime = time - blinkCycle->lastTime;
       // This code block blinks the LED at the Speed
@@ -188,20 +187,20 @@ int blinkLED(BlinkCycle *blinkCycle, unsigned long time)
       if (blinkCycle->currentState == HIGH && (elapsedTime >= blinkCycle->onDuration))
       {
         blinkCycle->currentState = LOW;
+        blinkCycle->lastTime = time;
       }
       else if (blinkCycle->currentState == LOW && (elapsedTime >= blinkCycle->offDuration))
       {
         blinkCycle->currentState = HIGH;
-        //increment cycle count if we care about max cycles
-        if (blinkCycle->maxOut) {
-          blinkCycle->currentCycle++;
-        }
+        blinkCycle->currentCycle++;
+        blinkCycle->lastTime = time;
       }
     }
     else
     {
-     //we're past the countdown, turn LED off
-     blinkCycle->currentState = blinkCycle->endState;
+      // we're past the countdown, turn LED to its end state
+      blinkCycle->currentState = blinkCycle->endState;
+      blinkCycle->currentCycle = 0;
     }
 //    Serial.print("state: on");
 //    Serial.print(blinkCycle->onDuration);
