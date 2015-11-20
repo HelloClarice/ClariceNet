@@ -180,10 +180,14 @@ void messageReady()
   
   // extract checksum
   long checksum = messenger.readLong();
+//  Serial.println("Checksum :" + String(checksum, DEC));
   
   // verify message checksum
   char line[lcdMessageLength];
   messenger.copyString(line, lcdMessageLength);
+  line[lcdMessageLength]='\0';
+//  Serial.println(line);
+    
   long calc_checksum = calculateChecksum(line); 
   if (checksum != calc_checksum) {
     Serial.print("invalid checksum for new line ");
@@ -313,22 +317,24 @@ void writeLCD()
 
       //reset this afer a question
       lcdBlink.currentCycle = 0;
+      char line[columns];
       //show regular state information
-      String fuelText = "Fuel % ";
       // The extra space is to circumvent a bug in the LCD display that shows the previous characters even though we've cleared the line
-      String line1 = fuelText + String(sensors[0], DEC) + "   ";
-      line1.toCharArray(lcdDisplay.line1, columns+1);
-      String tempText = "Temp % ";
-      String line2 = tempText + String(sensors[1], DEC) + "   ";
-      line2.toCharArray(lcdDisplay.line2, columns+1);
+      String fuel = "Fuel % " + String(sensors[0], DEC);
+      fuel.toCharArray(line, columns);
+      setLine(&lcdDisplay, line, 0);
+      String temp = "Temp % " + String(sensors[1], DEC);
+      temp.toCharArray(line, columns);
+      setLine(&lcdDisplay, line, 1);
       
+      clearLine(&lcdDisplay, 2);
       clearLine(&lcdDisplay, 3);
         
       //show comms issues if there are some
       if (noDataReceived > 10) {
-        String text="No pit data: ";
-        String toShow = text + noDataReceived;
-        toShow.toCharArray(lcdDisplay.line4, columns+1);
+        String toShow = "No pit data: " + String(noDataReceived, DEC);
+        toShow.toCharArray(line, columns);
+        setLine(&lcdDisplay, line, 3);
       }
     }
     showMessage(&lcd, &lcdDisplay);
@@ -417,7 +423,9 @@ void loop()
 
   // The following line is the most effective way of using Serial and Messenger's callback
   while (mySerial.available()) {
-    messenger.process(mySerial.read());
+    int c = mySerial.read();
+//    Serial.println("Read : " + String(c));
+    messenger.process(c);
   }
   
   //add all the buttons here
@@ -439,7 +447,7 @@ void loop()
   
   // send new data every sec only
   if (time-lastSentDataTime >= 250) {
-    Serial.println("Time : " + String(time));
+//    Serial.println("Time : " + String(time));
     lastSentDataTime = time;
     sendData();
     noDataReceived++; // this gets reset when new message is received

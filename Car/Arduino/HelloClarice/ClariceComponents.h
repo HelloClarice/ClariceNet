@@ -64,20 +64,41 @@ void resetLCD(LCDDisplay *lcdDisplay)
   lcdDisplay->line4[0] = '\0';
 }
 
+//void setLine(LCDDisplay *lcdDisplay, String string, int lineNumber)
+//{
+//    char line[columns+1];
+//    string.toCharArray(line, columns);
+//    setLine(lcdDisplay, line, lineNumber);
+//}
+
 void setLine(LCDDisplay *lcdDisplay, char line[], int lineNumber)
 {
-  switch (lineNumber) {
-    case 0:
-      strcpy(lcdDisplay->line1, line);
-      break;
-    case 1:
-      strcpy(lcdDisplay->line2, line);
-      break;
-    case 2:
-      strcpy(lcdDisplay->line3, line);
-      break;
-    default: 
-      strcpy(lcdDisplay->line4, line);
+  boolean foundNull = false;
+  for (int column=0; column<columns; column++) {
+    char c=line[column];
+    if (foundNull == true || c == '\0') 
+    {
+      foundNull = true;
+      c = ' ';
+    }
+    
+    switch (lineNumber) {
+      case 0:
+        lcdDisplay->line1[column] = c;
+        lcdDisplay->line1[columns] = '\0';
+        break;
+      case 1:
+        lcdDisplay->line2[column] = c;
+        lcdDisplay->line2[columns] = '\0';
+        break;
+      case 2:
+        lcdDisplay->line3[column] = c;
+        lcdDisplay->line3[columns] = '\0';
+        break;
+      default: 
+        lcdDisplay->line4[column] = c;
+        lcdDisplay->line4[columns] = '\0';
+    }
   }
 }
 
@@ -89,11 +110,8 @@ void writeLine(LiquidCrystal *lcd, char *line, int lineNumber)
 
 void clearLine(LCDDisplay *lcdDisplay, int lineNumber)
 {
-  char line[columns+1];
-  for (int i = 0; i < columns; i++) {
-    line[i] = ' ';
-  }
-  line[columns]='\0';
+  char line[columns];
+  line[0] ='\0';
   
   setLine(lcdDisplay, line, lineNumber);
 }
