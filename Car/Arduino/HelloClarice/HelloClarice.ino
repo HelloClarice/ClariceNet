@@ -39,9 +39,9 @@ From the info above, the format for data should look like:
 **/
 unsigned long time;
 unsigned long startTime;
-const int LED_SHORT = 100;
-const int LED_MEDIUM = 1000;
-const int LED_LONG = 2000;
+const int LED_SHORT = 150;
+const int LED_MEDIUM = 300;
+const int LED_LONG = 1000;
 const int LCD_ACK = 500;
 const int fuelIn = 0;
 const int tempIn = 1;
@@ -60,8 +60,8 @@ void messageReady();
 LiquidCrystal lcd(12, 7, 6, 5, 4, 3, 2);
 int lcdBackLight = 13;    // pin 13 will control the backlight
 const int LCD_CYCLE_SPEED = LED_SHORT;
-LCDDisplay lcdDisplay = {"", " Hello, Clarice....", "   Tell me about","    the silence ","    of the  cams", 5000, false, 0, 1, HIGH};
-BlinkCycle lcdBlink = {LED_LONG, LED_LONG, 50, HIGH, HIGH, 0, 0};
+LCDDisplay lcdDisplay = {"", " Hello, Clarice....", "   Tell me about","    the silence ","    of the  cams", 3000, false, 0, 1, HIGH};
+BlinkCycle lcdBlink = {LED_MEDIUM, LED_MEDIUM, 50, HIGH, HIGH, 0};
 
 /**
 * comms button data
@@ -70,9 +70,9 @@ const int COMM_BUTTON_COUNT = 10;
 int commButtonPins[COMM_BUTTON_COUNT] = {22, 24, 26, 28, 30, 32, 34, 36, 38, 40};
 int commLEDPins[COMM_BUTTON_COUNT] = {23, 25, 27, 29, 31, 33, 35, 37, 39, 41};
 Button commButtons[COMM_BUTTON_COUNT];
-BlinkCycle ledAck = {LED_LONG, LED_LONG, 0, HIGH, HIGH, 0, 0};
-BlinkCycle yesnoBlink = {LED_MEDIUM, LED_MEDIUM, 0, LOW, HIGH, 0, 0};
-BlinkCycle yesnoAck = {LED_LONG, 1, 2, LOW, HIGH, 0, 0};
+BlinkCycle ledAck = {LED_MEDIUM, LED_MEDIUM, 0, HIGH, HIGH, 0};
+BlinkCycle yesnoBlink = {LED_SHORT, LED_SHORT, 0, LOW, HIGH, 0};
+BlinkCycle yesnoAck = {LED_LONG, LED_SHORT, 0, LOW, HIGH, 0};
 Gauge fuelGauge = {500, 0, 0, .05, 100, 443, 0, true};
 Gauge tempGauge = {500, 0, 0, .05, 100, 591, 0, true};
 
@@ -351,8 +351,8 @@ void checkButtons()
       }
 
       // read the state of the pushbutton value:
-      //need to go through each one, then print state
-      //for the LED in the array
+      // need to go through each one, then print state
+      // for the LED in the array
       int currentPinState = digitalRead(commButtonPins[i]);    
       if (currentPinState == HIGH && commButtons[i].pinState == LOW)  {  
         //if this is an LCD response, let the LCD know
@@ -360,16 +360,17 @@ void checkButtons()
           lcdDisplay.responded = 1;
         }
         
-        //start with no pushed button
+        // start with no pushed button
         if (commButtons[i].carState == 0) {
           commButtons[i].carState = 1;
           commButtons[i].pitState = 0;          
         }
-        //Stop sending, we don't care and are resetting
+        // Stop sending, we don't care and are resetting
+        // This will turn off LED as well
         else if (commButtons[i].carState == 1) {
           commButtons[i].carState = 0;
         }
-        //only reset if there is a pit ack
+        // Only reset if there is a pit ack
         else if (commButtons[i].carState == 2 && commButtons[i].pitState > 0) {
           commButtons[i].carState = 0;
           commButtons[i].pitState = 0;          
@@ -377,13 +378,17 @@ void checkButtons()
       } 
       commButtons[i].pinState = currentPinState;
       
-      //if we're showing a button push, but havent received an acknowledgement, show blinking LED
+      // if we're showing a button push, but havent received an acknowledgement, show blinking LED
       if (commButtons[i].carState == 1) {
-        digitalWrite(commLEDPins[i], buttonAckState);
+        if (i==8 || i==9) {
+          digitalWrite(commLEDPins[i], yesNoAckState);
+        } else {
+          digitalWrite(commLEDPins[i], buttonAckState);
+        }
       }
-      //we've received an acknowledgement, now note that with solid
+      // we've received an acknowledgement, now note that with solid
       else if (commButtons[i].carState == 2) {
-        //yes/no button? 
+        // yes/no buttons? 
         if (i==8 || i==9) {
           digitalWrite(commLEDPins[i], LOW);
           commButtons[i].carState = 0;
@@ -421,8 +426,7 @@ void loop()
   //read gauges if time appropriate
   sensors[0] = readGauge(&fuelGauge, fuelIn, time); 
   sensors[1] = readGauge(&tempGauge, tempIn, time); 
-  
-//  sensors[0] = analogRead(fuelIn);
+
 //  Serial.println("Temp:" + sensors[0]);
   
   //write data to lcd
@@ -434,7 +438,7 @@ void loop()
   }
   
   // send new data every sec only
-  if (time-lastSentDataTime >= 1000) {
+  if (time-lastSentDataTime >= 250) {
     Serial.println("Time : " + String(time));
     lastSentDataTime = time;
     sendData();
