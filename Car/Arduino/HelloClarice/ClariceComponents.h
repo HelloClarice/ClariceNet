@@ -34,10 +34,7 @@ typedef struct {
   //has to be 21, so we can end with \0
   //otherwise this memory all runs together 
   //for the LCD, causing duplicate rows
-  char line1[columns+1];
-  char line2[columns+1];
-  char line3[columns+1];
-  char line4[columns+1];
+  char line[rows][columns+1];
   
   long startupMessageTime;
   boolean started;
@@ -58,48 +55,31 @@ void resetLCD(LCDDisplay *lcdDisplay)
   lcdDisplay->newMessage = 0;
   lcdDisplay->responded = 1;
   lcdDisplay->message[0] = '\0';
-  lcdDisplay->line1[0] = '\0';
-  lcdDisplay->line2[0] = '\0';
-  lcdDisplay->line3[0] = '\0';
-  lcdDisplay->line4[0] = '\0';
+  for (int row=0; row<rows; row++) 
+  {
+    lcdDisplay->line[row][0] = '\0';
+  }
 }
 
-//void setLine(LCDDisplay *lcdDisplay, String string, int lineNumber)
-//{
-//    char line[columns+1];
-//    string.toCharArray(line, columns);
-//    setLine(lcdDisplay, line, lineNumber);
-//}
-
-void setLine(LCDDisplay *lcdDisplay, char line[], int lineNumber)
+void setLine(char LCDLine[], char line[])
 {
   boolean foundNull = false;
-  for (int column=0; column<columns; column++) {
+  for (int column=0; column<columns; column++) 
+  {
     char c=line[column];
+    
+    // replace anything after NULL char including it by space
+    // to properly erase line
     if (foundNull == true || c == '\0') 
     {
       foundNull = true;
       c = ' ';
     }
     
-    switch (lineNumber) {
-      case 0:
-        lcdDisplay->line1[column] = c;
-        lcdDisplay->line1[columns] = '\0';
-        break;
-      case 1:
-        lcdDisplay->line2[column] = c;
-        lcdDisplay->line2[columns] = '\0';
-        break;
-      case 2:
-        lcdDisplay->line3[column] = c;
-        lcdDisplay->line3[columns] = '\0';
-        break;
-      default: 
-        lcdDisplay->line4[column] = c;
-        lcdDisplay->line4[columns] = '\0';
-    }
+    LCDLine[column] = c;
   }
+  
+  LCDLine[columns] = '\0';
 }
 
 void writeLine(LiquidCrystal *lcd, char *line, int lineNumber)
@@ -108,12 +88,12 @@ void writeLine(LiquidCrystal *lcd, char *line, int lineNumber)
   lcd->print(line);
 }
 
-void clearLine(LCDDisplay *lcdDisplay, int lineNumber)
+void clearLine(char LCDLine[])
 {
   char line[columns];
   line[0] ='\0';
   
-  setLine(lcdDisplay, line, lineNumber);
+  setLine(LCDLine, line);
 }
 
 /**********************************************************************************
@@ -135,14 +115,14 @@ void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
       int lineLen = 0;
       for (int j = 0; j < columns; j++) {
         if ((msgPos <= lcdMessageLength) && (lcdDisplay->message[msgPos]!='\0')) {
-          line[j]=lcdDisplay->message[msgPos];
+          line[j] = lcdDisplay->message[msgPos];
           msgPos++;
           lineLen++;
         }
       }
       //message may have been shorter than whole line, so terminate
       line[lineLen] = '\0';
-      setLine(lcdDisplay, line, i);
+      setLine(lcdDisplay->line[i], line);
     }
     
     lcdDisplay->newMessage=0;
@@ -150,10 +130,10 @@ void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
   }
   
   //for each line in lcd display, show it.
-  writeLine(lcd, lcdDisplay->line1, 0);
-  writeLine(lcd, lcdDisplay->line2, 1);
-  writeLine(lcd, lcdDisplay->line3, 2);
-  writeLine(lcd, lcdDisplay->line4, 3);
+  for (int row=0; row<rows; row++)
+  {   
+    writeLine(lcd, lcdDisplay->line[row], row);
+  }
 }
 
 

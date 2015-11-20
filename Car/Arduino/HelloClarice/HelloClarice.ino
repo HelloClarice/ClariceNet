@@ -315,26 +315,27 @@ void writeLCD()
     else {
       digitalWrite(lcdBackLight, lcdDisplay.light);   
 
-      //reset this afer a question
+      // reset this afer a question
       lcdBlink.currentCycle = 0;
       char line[columns];
-      //show regular state information
+      // show regular state information
       // The extra space is to circumvent a bug in the LCD display that shows the previous characters even though we've cleared the line
       String fuel = "Fuel % " + String(sensors[0], DEC);
       fuel.toCharArray(line, columns);
-      setLine(&lcdDisplay, line, 0);
+      setLine(lcdDisplay.line[0], line);
+      
       String temp = "Temp % " + String(sensors[1], DEC);
       temp.toCharArray(line, columns);
-      setLine(&lcdDisplay, line, 1);
+      setLine(lcdDisplay.line[1], line);
       
-      clearLine(&lcdDisplay, 2);
-      clearLine(&lcdDisplay, 3);
+      clearLine(lcdDisplay.line[2]);
+      clearLine(lcdDisplay.line[3]);
         
       //show comms issues if there are some
       if (noDataReceived > 10) {
         String toShow = "No pit data: " + String(noDataReceived, DEC);
         toShow.toCharArray(line, columns);
-        setLine(&lcdDisplay, line, 3);
+        setLine(lcdDisplay.line[3], line);
       }
     }
     showMessage(&lcd, &lcdDisplay);
