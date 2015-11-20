@@ -35,12 +35,16 @@ From the info above, the format for data should look like:
 **/
 
 /**
-* common values like LED blink lengths
+* common values like LED blink times in milliseconds. Time is the current loop time.
 **/
-const int LED_SHORT = 2;
-const int LED_MEDIUM = 6;
-const int LED_LONG = 9;
-const int LCD_ACK = 20;
+unsigned long time;
+unsigned long startTime;
+const int LED_SHORT = 100;
+const int LED_MEDIUM = 1000;
+const int LED_LONG = 2000;
+const int LCD_ACK = 500;
+const int fuelIn = 0;
+const int tempIn = 1;
 
 /**
 * serial Communication via XBee
@@ -56,7 +60,7 @@ void messageReady();
 LiquidCrystal lcd(12, 7, 6, 5, 4, 3, 2);
 int lcdBackLight = 13;    // pin 13 will control the backlight
 const int LCD_CYCLE_SPEED = LED_SHORT;
-LCDDisplay lcdDisplay = {"", " Hello, Clarice....", "   Tell me about","    the silence ","    of the  cams", 100, 0, 1, HIGH};
+LCDDisplay lcdDisplay = {"", " Hello, Clarice....", "   Tell me about","    the silence ","    of the  cams", 5000, false, 0, 1, HIGH};
 BlinkCycle lcdBlink = {LED_LONG, LED_LONG, true, 50, HIGH, HIGH, 0, 0};
 
 /**
@@ -69,17 +73,23 @@ Button commButtons[COMM_BUTTON_COUNT];
 BlinkCycle ledAck = {LED_MEDIUM, LED_MEDIUM, false, 0, HIGH, HIGH, 0, 0};
 BlinkCycle yesnoBlink = {LED_MEDIUM, LED_MEDIUM, false, 0, LOW, HIGH, 0, 0};
 BlinkCycle yesnoAck = {LED_LONG, 1, true, 2, LOW, HIGH, 0, 0};
+Gauge fuelGauge = {500, 0, 0, .05, 100, 443, 0, true};
+Gauge tempGauge = {500, 0, 0, .05, 100, 591, 0, true};
 
 /**
 * raw data from sensors
+* 0 = FUEL
+* 1 = TEMPERATURE
+* 2 = Future Use
+* 3 = Future Use
 **/
 const int COMM_SENSOR_COUNT = 4;
-int sensors[COMM_SENSOR_COUNT] = {123, 456, 678, 900}; //MOCK DATA
+unsigned int sensors[COMM_SENSOR_COUNT] = {0, 0, 0, 0};
 
 /**
 Application state. Describe status of acknowledgements, what display should show, which buttons should be lit, etc
 **/
-// number of buttons,   number separators, length of message
+// number of buttons, number separators, length of message
 //const int inputLength = COMM_BUTTON_COUNT + COMM_BUTTON_COUNT + lcdMessageLength; 
 int noDataReceived = 0;
 unsigned long lastSentDataTime = 0;
@@ -89,6 +99,8 @@ unsigned long lastSentDataTime = 0;
 **********************************************************************************/
 void setup() 
 {
+    analogReference(2);
+    
     for (int i=0; i<COMM_BUTTON_COUNT; i++) {
       Button b = {LOW, 0, 0};
       commButtons[i] = b;
@@ -163,7 +175,7 @@ long calculateChecksum(const char* input)
 void messageReady() 
 {
 //  Serial.print("Message received. Lag: ");
-//  Serial.println(noDataReceived);
+  Serial.println(noDataReceived);
   noDataReceived = 0;
   
   // extract checksum
@@ -275,45 +287,48 @@ void sendData()
 **********************************************************************************/
 void writeLCD()
 {
+  boolean inStartMode = (startTime + lcdDisplay.startupMessageTime) > time;
+
   // if still in startup mode (showing nice text), 
   // just skip touching the LCD
-  if (lcdDisplay.startupCount > 0) {
-    lcdDisplay.startupCount--;
     //reset the message
-    if (lcdDisplay.startupCount == 0) {
-      resetLCD(&lcdDisplay);
-      lcd.clear();
-    }
+  if (!inStartMode && !lcdDisplay.started) {
+    resetLCD(&lcdDisplay);
+    lcd.clear();
+    lcdDisplay.started = true;
   }
   
   //Show non startup message
-  if (lcdDisplay.startupCount <= 0) {
+  if (!inStartMode && lcdDisplay.started) {
     //if waiting for a response, need to occasionally blink the LCD
     if (lcdDisplay.responded == 0) {
-       digitalWrite(lcdBackLight, blinkLED(&lcdBlink));
-       int yesState = blinkLED(&yesnoBlink);
+       digitalWrite(lcdBackLight, blinkLED(&lcdBlink, time));
+       int yesState = blinkLED(&yesnoBlink, time);
        int noState = reverseLED(yesState);
        digitalWrite(commLEDPins[8], yesState);
        digitalWrite(commLEDPins[9], noState);
     }
     else {
-      digitalWrite(lcdBackLight, lcdDisplay.light);    
+      digitalWrite(lcdBackLight, lcdDisplay.light);   
+
       //reset this afer a question
       lcdBlink.currentCycle = 0;
       //show regular state information
-      String text1="First sensor data";
-      text1.toCharArray(lcdDisplay.line1, 21);
-      String text2="Second sensor data";
-      text2.toCharArray(lcdDisplay.line2, 21);
+      String fuelText = "Fuel % ";
+      // The extra space is to circumvent a bug in the LCD display that shows the previous characters even though we've cleared the line
+      String line1 = fuelText + String(sensors[0], DEC) + "   ";
+      line1.toCharArray(lcdDisplay.line1, columns+1);
+      String tempText = "Temp % ";
+      String line2 = tempText + String(sensors[1], DEC) + "   ";
+      line2.toCharArray(lcdDisplay.line2, columns+1);
       
+      clearLine(&lcdDisplay, 3);
+        
       //show comms issues if there are some
       if (noDataReceived > 10) {
         String text="No pit data: ";
         String toShow = text + noDataReceived;
-        toShow.toCharArray(lcdDisplay.line4, 21);
-      }
-      else {
-        clearLine(&lcdDisplay, 3);
+        toShow.toCharArray(lcdDisplay.line4, columns+1);
       }
     }
     showMessage(&lcd, &lcdDisplay);
@@ -326,8 +341,8 @@ void writeLCD()
 **********************************************************************************/
 void checkButtons()
 {
-   int buttonAckState = blinkLED(&ledAck);
-   int yesNoAckState = blinkLED(&yesnoAck);
+   int buttonAckState = blinkLED(&ledAck, time);
+   int yesNoAckState = blinkLED(&yesnoAck, time);
   
    for (int i = 0; i < COMM_BUTTON_COUNT; i++) {
       // if we received a pit ack, change car state to 2
@@ -336,8 +351,8 @@ void checkButtons()
       }
 
       // read the state of the pushbutton value:
-      // need to go through each one, then print state
-      // for the LED in the array
+      //need to go through each one, then print state
+      //for the LED in the array
       int currentPinState = digitalRead(commButtonPins[i]);    
       if (currentPinState == HIGH && commButtons[i].pinState == LOW)  {  
         //if this is an LCD response, let the LCD know
@@ -362,18 +377,17 @@ void checkButtons()
       } 
       commButtons[i].pinState = currentPinState;
       
-      // if we're showing a button push, but havent received an acknowledgement, show blinking LED
+      //if we're showing a button push, but havent received an acknowledgement, show blinking LED
       if (commButtons[i].carState == 1) {
         digitalWrite(commLEDPins[i], buttonAckState);
       }
-      // we've received an acknowledgement
+      //we've received an acknowledgement, now note that with solid
       else if (commButtons[i].carState == 2) {
-        // yes/no buttons blinks for a few cycles
+        //yes/no button? 
         if (i==8 || i==9) {
           digitalWrite(commLEDPins[i], LOW);
           commButtons[i].carState = 0;
         }
-        // blinking leds stay solid until button pushed again
         else {
           digitalWrite(commLEDPins[i], HIGH);
         }
@@ -391,23 +405,42 @@ void checkButtons()
 **********************************************************************************/
 void loop()
 {
+  time = millis();
+  if (startTime == 0) {
+    startTime = time;
+  }
+
   // The following line is the most effective way of using Serial and Messenger's callback
-  while (mySerial.available())  {
+  while (mySerial.available()) {
     messenger.process(mySerial.read());
   }
   
-  // add all the buttons here
+  //add all the buttons here
   checkButtons();
+  
+  //read gauges if time appropriate
+  sensors[0] = readGauge(&fuelGauge, fuelIn, time); 
+  sensors[1] = readGauge(&tempGauge, tempIn, time); 
+  
+//  sensors[0] = analogRead(fuelIn);
+//  Serial.println("Temp:" + sensors[0]);
+  
+  //write data to lcd
   writeLCD();
   
-  // send new data every 1/2 sec only
-  int now = millis();
-  if (now-lastSentDataTime >= 500) {
+  // Handle rollover
+  if (time < lastSentDataTime) {
+    lastSentDataTime = time;
+  }
+  
+  // send new data every sec only
+  if (time-lastSentDataTime >= 1000) {
+    Serial.println("Time : " + String(time));
+    lastSentDataTime = time;
     sendData();
-     
-    lastSentDataTime = now;
     noDataReceived++; // this gets reset when new message is received
   }
+  
   delay(10);
 }
  

@@ -19,7 +19,6 @@ typedef struct {
   int pitState;
 } Button;
 
-
 /**
 * LCD data
 * This allows the showMessage method to break up the 'message' array into lines
@@ -40,8 +39,9 @@ typedef struct {
   char line3[columns+1];
   char line4[columns+1];
   
-  int startupCount;
-
+  long startupMessageTime;
+  boolean started;
+  
   //set when a new message has been added
   int newMessage;
   
@@ -50,6 +50,7 @@ typedef struct {
   
   //state of the LCD Backlight
   int light;
+  
 } LCDDisplay;
 
 void resetLCD(LCDDisplay *lcdDisplay)
@@ -63,32 +64,38 @@ void resetLCD(LCDDisplay *lcdDisplay)
   lcdDisplay->line4[0] = '\0';
 }
 
-void writeLine(LCDDisplay *lcdDisplay, char line[], int lineNumber)
+void setLine(LCDDisplay *lcdDisplay, char line[], int lineNumber)
 {
-  line[columns] = '\0';
   switch (lineNumber) {
     case 0:
-      memcpy(lcdDisplay->line1,line,columns);
+      strcpy(lcdDisplay->line1, line);
       break;
     case 1:
-      memcpy(lcdDisplay->line2,line,columns);
+      strcpy(lcdDisplay->line2, line);
       break;
     case 2:
-      memcpy(lcdDisplay->line3,line,columns);
+      strcpy(lcdDisplay->line3, line);
       break;
     default: 
-      memcpy(lcdDisplay->line4,line,columns);
+      strcpy(lcdDisplay->line4, line);
   }
+}
+
+void writeLine(LiquidCrystal *lcd, char *line, int lineNumber)
+{
+  lcd->setCursor(0, lineNumber);
+  lcd->print(line);
 }
 
 void clearLine(LCDDisplay *lcdDisplay, int lineNumber)
 {
   char line[columns+1];
   for (int i = 0; i < columns; i++) {
-    line[i] = ' ';
+    line[i] = '\0';
   }
   line[columns]='\0';
-  writeLine(lcdDisplay, line, lineNumber);
+  
+  setLine(lcdDisplay, line, lineNumber);
 }
 
 /**********************************************************************************
@@ -98,6 +105,8 @@ void clearLine(LCDDisplay *lcdDisplay, int lineNumber)
 **********************************************************************************/
 void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
 {
+  //lcd->clear();
+    
   if (lcdDisplay->newMessage == 1) {
     //convert to line by line message for display below
     int msgPos = 0;
@@ -115,24 +124,18 @@ void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
       }
       //message may have been shorter than whole line, so terminate
       line[lineLen] = '\0';
-      writeLine(lcdDisplay, line, i);
+      setLine(lcdDisplay, line, i);
     }
-  }
-
-  if (lcdDisplay->newMessage == 1) {
+    
     lcdDisplay->newMessage=0;
     lcd->clear();
   }
   
   //for each line in lcd display, show it.
-  lcd->setCursor(0,0);
-  lcd->print(lcdDisplay->line1);
-  lcd->setCursor(0,1);
-  lcd->print(lcdDisplay->line2);
-  lcd->setCursor(0,2);
-  lcd->print(lcdDisplay->line3);
-  lcd->setCursor(0,3);
-  lcd->print(lcdDisplay->line4);
+  writeLine(lcd, lcdDisplay->line1, 0);
+  writeLine(lcd, lcdDisplay->line2, 1);
+  writeLine(lcd, lcdDisplay->line3, 2);
+  writeLine(lcd, lcdDisplay->line4, 3);
 }
 
 
@@ -141,14 +144,16 @@ void showMessage(LiquidCrystal *lcd, LCDDisplay *lcdDisplay)
 * 
 * Blinking has a duration on / off cycle (the blink) and an end state (like LED on or off).
 *
-* All durations are actually number of loop counts. So if the loop delays for 50ms, a duration of 2 
-* means 2 loops (or 100ms)
+* All durations are in ms
 **/
 typedef struct {
-  //how many loops should the light be on
-  int onDuration; 
-  //how many loops should the light be off
-  int offDuration;
+  //how many millis should the light be on
+  unsigned long onDuration;
+  //how many millis should the light be off
+  unsigned long offDuration;
+
+  //store the cycle (on or off) start time for comparison
+  unsigned long lastTime;
 
   //if there are max cycles, use them
   boolean maxOut;
@@ -161,43 +166,43 @@ typedef struct {
   
   //for state management
   int currentCycle;
-  int currentDuration;
 } BlinkCycle;
 
 /**********************************************************************************
-* The blinkSpeed is the speed of an on/off cycle. The clock goes for 50ms, 
-* so a speed of 10 means 50*10ms on, 50*10ms off 
+* The blinkSpeed is the speed of an on/off cycle. On and Off durations are in ms,
+* and could be different (as in LCD)
 *
 * ignoring the counter causes this to blink perpetually, instead of stopping
 * when the button counter hits 0
+*
+* pass the current time for the cycle to compare
 **********************************************************************************/
-int blinkLED(BlinkCycle *blinkCycle)
+int blinkLED(BlinkCycle *blinkCycle, unsigned long time)
 {
-    if (!blinkCycle->maxOut || (blinkCycle->maxCycles >= blinkCycle->currentCycle)) {
-      blinkCycle->currentDuration++;
-        
+    if (!blinkCycle->maxOut  || (blinkCycle->maxCycles >= blinkCycle->currentCycle))
+    {
+      unsigned long elapsedTime = time - blinkCycle->lastTime;
       // This code block blinks the LED at the Speed
       //basically if we've hit the countdown for the cycle
       //reset and change the state from low to high or reverse
-      if (blinkCycle->currentState == HIGH && (blinkCycle->currentDuration >= blinkCycle->onDuration)) {
+      if (blinkCycle->currentState == HIGH && (elapsedTime >= blinkCycle->onDuration))
+      {
         blinkCycle->currentState = LOW;
-        blinkCycle->currentDuration = 0;
       }
-      else if (blinkCycle->currentState == LOW && (blinkCycle->currentDuration >= blinkCycle->offDuration)) {
+      else if (blinkCycle->currentState == LOW && (elapsedTime >= blinkCycle->offDuration))
+      {
         blinkCycle->currentState = HIGH;
-          
         //increment cycle count if we care about max cycles
         if (blinkCycle->maxOut) {
           blinkCycle->currentCycle++;
         }
-        blinkCycle->currentDuration = 0;
       }
     }
-    else {
+    else
+    {
      //we're past the countdown, turn LED off
      blinkCycle->currentState = blinkCycle->endState;
-   }
-    
+    }
 //    Serial.print("state: on");
 //    Serial.print(blinkCycle->onDuration);
 //    Serial.print(", off");
@@ -217,5 +222,124 @@ int blinkLED(BlinkCycle *blinkCycle)
 
 int reverseLED(int state)
 {
-  return state == HIGH ? LOW : HIGH;
+  int result = HIGH;
+  if (state == HIGH) {
+    result = LOW;
+  }
+  return result;
+}
+
+
+/**********************************************************************************
+* GAUGE
+* 
+* Gauge data will allow mapping incoming voltage to the gauge ranges. 
+* The mapped value is then used to impact the current value of the gauge,
+* either through low pass filtering or simple addition.
+*
+* Remember that current fuel gauge is inverted. Max is lower voltage, so this 
+* will return inverted values (75% is actually 25%). So 1-value not value.
+**********************************************************************************/
+typedef struct {
+  //duration to check gauge in millis
+  unsigned long duration;
+  unsigned long lastCheckTime;
+    
+  //current gauge values
+  float currentValue;
+  float LPAlpha;
+
+  //maximum gauge value
+  int maxValue;
+
+  //maximum input value
+  int maxIn;
+  //minimum input value  
+  int minIn;
+  
+  //is max the 'empty' on gauge? then invert it
+  boolean inverted;
+} Gauge;
+
+float mapToGauge(Gauge *gauge, int value)
+{
+  float maxGauge = gauge->maxValue;
+  float maxIn = gauge->maxIn;
+  float minIn = gauge->minIn;
+  
+  float inDelta = maxIn-minIn;
+  float percent = value / inDelta;
+  return maxGauge * percent;
+}
+
+int readGauge(Gauge *gauge, int analogPin, long currentTime)
+{
+  //time to take another reading?
+  if (currentTime > (gauge->lastCheckTime + gauge->duration))
+  {
+     int value = 0;
+     for (int i = 0; i < 1; i++)
+     {
+       int thisRead = analogRead(analogPin);
+       value = value + thisRead;
+//       Serial.print(" read ");
+//       Serial.print(i);
+//       Serial.print(":");
+//       Serial.print(thisRead);
+     }
+     value = value / 1;
+//     Serial.print("avg:");
+//     Serial.println(value);
+    
+     float mappedValue = mapToGauge(gauge, value);
+     
+     //cleanup
+     if (mappedValue > gauge->maxValue)
+     {
+       mappedValue = gauge->maxValue;
+     } 
+     else if (mappedValue < 0)
+     {
+       mappedValue = 0;
+     }
+     
+     if (gauge->inverted)
+     {
+//       Serial.print("inverting:");
+//       Serial.print(gauge->maxValue);
+//       Serial.print(" mapped:");
+//       Serial.print(mappedValue);
+       mappedValue = gauge->maxValue - mappedValue;
+//       Serial.print(" newmapped:");
+//       Serial.println(mappedValue);
+     }
+
+     //apply low pass method
+     gauge->currentValue = gauge->currentValue - (gauge->LPAlpha * (gauge->currentValue - mappedValue));
+
+//     Serial.print("read value:");
+//     Serial.print(value);
+//     Serial.print(" mapped value:");
+//     Serial.print(mappedValue);
+//     Serial.print(" max/min in: (");
+//     Serial.print(gauge->maxIn);
+//     Serial.print("/");
+//     Serial.print(gauge->minIn);
+//     Serial.print(") maxGaugeValue:");
+//     Serial.print(gauge->maxValue);
+//     Serial.print(" gauge:");
+//     Serial.println(gauge->currentValue);
+     
+     //cleanup
+     if(gauge->currentValue > gauge->maxValue)
+     {
+       gauge->currentValue = gauge->maxValue;
+     }
+     if(gauge->currentValue < 0)
+     {
+       gauge->currentValue = 0;
+     }
+     gauge->lastCheckTime = currentTime;
+  }
+  return lround(gauge->currentValue);
 }
