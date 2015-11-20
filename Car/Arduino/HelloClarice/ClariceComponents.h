@@ -91,7 +91,7 @@ void clearLine(LCDDisplay *lcdDisplay, int lineNumber)
 {
   char line[columns+1];
   for (int i = 0; i < columns; i++) {
-    line[i] = '\0';
+    line[i] = ' ';
   }
   line[columns]='\0';
   
@@ -184,12 +184,12 @@ int blinkLED(BlinkCycle *blinkCycle, unsigned long time)
       // This code block blinks the LED at the Speed
       //basically if we've hit the countdown for the cycle
       //reset and change the state from low to high or reverse
-      if (blinkCycle->currentState == HIGH && (elapsedTime >= blinkCycle->onDuration))
+      if (blinkCycle->currentState == HIGH && elapsedTime >= blinkCycle->onDuration)
       {
         blinkCycle->currentState = LOW;
         blinkCycle->lastTime = time;
       }
-      else if (blinkCycle->currentState == LOW && (elapsedTime >= blinkCycle->offDuration))
+      else if (blinkCycle->currentState == LOW && elapsedTime >= blinkCycle->offDuration)
       {
         blinkCycle->currentState = HIGH;
         blinkCycle->currentCycle++;
